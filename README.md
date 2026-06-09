@@ -59,7 +59,7 @@ Full step-by-step installation instructions are available on the Securiti websit
 
 | Version | Release Date | Notes |
 |---|---|---|
-| [v1.0.0](https://github.com/dominic96/securiti-releases/releases/tag/v1.0.0) | June 2026 | Initial public release |
+| [v1.2.0](https://github.com/dominic96/securiti-releases/releases/tag/v1.2.0) | June 2026 | Initial public release |
 
 ---
 

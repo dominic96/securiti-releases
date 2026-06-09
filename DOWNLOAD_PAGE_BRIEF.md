@@ -32,8 +32,8 @@ The installer is hosted on GitHub Releases:
 
 | Field | Value |
 |---|---|
-| Version | **v1.2.0** |
-| Release date | May 2026 |
+| Version tag | **v1.2.0** |
+| Release date | June 2026 |
 | File name | `Securiti_V1_Setup.exe` |
 | File size | **377 MB** |
 | Platform | Windows 10 / Windows 11 (64-bit) |
@@ -216,7 +216,7 @@ Below the main download card, include a collapsible or secondary table of all pu
 
 | Version | Release Date | Platform | Size | Download |
 |---|---|---|---|---|
-| v1.2.0 *(Latest)* | May 2026 | Windows 10/11 64-bit | 377 MB | [Download] |
+| v1.2.0 *(Latest)* | June 2026 | Windows 10/11 64-bit | 377 MB | [Download] |
 
 > This table should also be loaded from the GitHub Releases API:
 > `GET https://api.github.com/repos/dominic96/securiti-releases/releases`
