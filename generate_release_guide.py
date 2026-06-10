@@ -381,52 +381,34 @@ add_note(doc,
 # Step 6
 add_step_header(doc, 6, 'Upload to GitHub Releases')
 add_body(doc,
-    'Run the PowerShell script below. Replace 1.3.0 with the new version number. '
-    'The script creates the release, uploads the .exe, and publishes it in one go.')
+    'A ready-to-run PowerShell script handles the entire release in one go: '
+    'creating the draft, uploading the installer, and publishing. '
+    'There is only one line to edit before running it.')
+add_body(doc, 'Script location:')
 add_code_block(doc,
-    '$token   = $(gh auth token)\n'
-    '$version = "1.3.0"    # ← change this to match MyAppVersion\n'
-    '$file    = "C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\Output\\Securiti_Desktop_Setup_$version.exe"\n'
-    '\n'
-    '$headers = @{\n'
-    '    "Authorization" = "token $token"\n'
-    '    "Accept"        = "application/vnd.github+json"\n'
-    '    "Content-Type"  = "application/json"\n'
-    '}\n'
-    '\n'
-    '# 1. Create draft release\n'
-    '$body = @{\n'
-    '    tag_name = "v$version"\n'
-    '    name     = "Securiti Desktop Server v$version"\n'
-    '    draft    = $true\n'
-    '    body     = "## Securiti Desktop Server v$version`n`nSee release notes."\n'
-    '} | ConvertTo-Json\n'
-    '$release = Invoke-RestMethod `\n'
-    '    -Uri "https://api.github.com/repos/dominic96/securiti-releases/releases" `\n'
-    '    -Method Post -Headers $headers -Body $body\n'
-    '\n'
-    '# 2. Upload installer (allow up to 30 minutes for large file)\n'
-    '$uploadHeaders = @{\n'
-    '    "Authorization" = "token $token"\n'
-    '    "Content-Type"  = "application/octet-stream"\n'
-    '}\n'
-    '$uploadUrl = "https://uploads.github.com/repos/dominic96/securiti-releases/releases/$($release.id)/assets?name=Securiti_Desktop_Setup_$version.exe"\n'
-    'Invoke-RestMethod `\n'
-    '    -Uri $uploadUrl -Method Post `\n'
-    '    -Headers $uploadHeaders `\n'
-    '    -Body ([System.IO.File]::ReadAllBytes($file)) `\n'
-    '    -TimeoutSec 1800\n'
-    '\n'
-    '# 3. Publish the release (take out of draft)\n'
-    '$publishBody = @{ draft = $false } | ConvertTo-Json\n'
-    'Invoke-RestMethod `\n'
-    '    -Uri "https://api.github.com/repos/dominic96/securiti-releases/releases/$($release.id)" `\n'
-    '    -Method Patch -Headers $headers -Body $publishBody\n'
-    '\n'
-    'Write-Host "Done! https://github.com/dominic96/securiti-releases/releases/tag/v$version"')
+    'python/securiti-desktop/installer_build/publish_release.ps1')
+add_body(doc, 'The only line you need to edit is at the top of the script:')
+add_code_block(doc,
+    '$Version = "1.3.0"   # ← change this to match MyAppVersion in SecuritiInstallerV1.iss')
+add_body(doc,
+    'Optionally update $ReleaseNotes in the same file to describe what changed. '
+    'Then run the script from PowerShell:')
+add_code_block(doc,
+    'cd "C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build"\n'
+    '.\\publish_release.ps1')
+add_body(doc, 'The script runs three steps and prints progress:')
+add_two_col_table(doc,
+    rows=[
+        ('[1/3] Creating draft release',  'Creates the release on GitHub with the correct tag and release notes'),
+        ('[2/3] Uploading installer',      'Uploads Securiti_Desktop_Setup_{version}.exe — allow 5–15 min for ~400 MB'),
+        ('[3/3] Publishing release',       'Takes the release out of draft so it is publicly visible'),
+    ],
+    header_row=['Step', 'What it does'],
+)
+add_body(doc, 'On success the script prints the release URL and download URL.')
 add_warning(doc,
-    'The upload can take 5–15 minutes for a ~400 MB file. '
-    'Do not close PowerShell while it is running.')
+    'Do not close PowerShell during the upload. If the upload fails mid-way, '
+    'delete the draft release on GitHub (releases page → Delete) then re-run the script.')
 
 # Step 7
 add_step_header(doc, 7, 'Verify the website has updated')
@@ -576,9 +558,9 @@ steps_check = [
     ('Step 4', 'FilesToInstall\\ fully populated — Server\\, VideoServer\\, Nginx\\, NSSM\\, Redist\\ all present'),
     ('Step 5', 'Inno Setup compiled successfully — Securiti_Desktop_Setup_{version}.exe present in Output\\'),
     ('Step 5', 'Installer filename includes the correct version number'),
-    ('Step 6', 'GitHub release created with tag v{version}'),
-    ('Step 6', 'Installer .exe attached to the GitHub release as an asset'),
-    ('Step 6', 'Release published (not left as draft)'),
+    ('Step 6', '$Version updated in publish_release.ps1 to match MyAppVersion'),
+    ('Step 6', 'publish_release.ps1 ran without errors — all 3 steps completed'),
+    ('Step 6', 'Release URL printed by script — confirm tag is v{version} and not a draft'),
     ('Step 7', 'GitHub API returns the new version at /releases/latest'),
     ('Step 7', 'Website download page shows new version, date, and file size'),
     ('Step 7', 'Download button triggers the correct versioned .exe file'),
@@ -603,8 +585,8 @@ add_two_col_table(doc,
         ('Website download button URL',  '✅ Auto — reads from GitHub API'),
         ('Website version history table','✅ Auto — reads from GitHub API'),
         ('MyAppVersion in .iss',         '✏️  Manual — you change this (one line)'),
-        ('$version in upload script',    '✏️  Manual — you change this to match (one line)'),
-        ('GitHub release notes / body',  '✏️  Manual — edit the $body in the upload script'),
+        ('$Version in publish_release.ps1', '✏️  Manual — one line at the top of the script'),
+        ('$ReleaseNotes in publish_release.ps1', '✏️  Manual — describe what changed in this version'),
     ],
     header_row=['Component', 'How it updates'],
 )
@@ -693,6 +675,21 @@ run.italic = True
 
 # ── Save ─────────────────────────────────────────────────────────────────────
 
+import os, time
 output = 'Securiti_Desktop_Release_Guide.docx'
-doc.save(output)
+tmp    = output + '.tmp.docx'
+doc.save(tmp)
+for _ in range(5):
+    try:
+        if os.path.exists(output):
+            os.replace(tmp, output)
+        else:
+            os.rename(tmp, output)
+        break
+    except PermissionError:
+        print('File is open — retrying in 3 s (close Word if prompted)...')
+        time.sleep(3)
+else:
+    print(f'Could not replace {output} — saved as {tmp} instead')
+    output = tmp
 print(f'Generated: {output}')
