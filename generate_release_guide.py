@@ -215,6 +215,36 @@ def add_two_col_table(doc, rows, header_row=None, col_widths=None):
     doc.add_paragraph()
 
 
+def add_three_col_table(doc, rows, header_row=None):
+    table = doc.add_table(rows=0, cols=3)
+    table.style = 'Table Grid'
+    if header_row:
+        hrow = table.add_row()
+        for i, text in enumerate(header_row):
+            cell = hrow.cells[i]
+            set_cell_bg(cell, HEX_NAVY)
+            set_cell_border(cell, color='060061', sz=4)
+            p = cell.paragraphs[0]
+            run = p.add_run(text)
+            run.bold = True
+            run.font.color.rgb = WHITE
+            run.font.size = Pt(9.5)
+            run.font.name = 'Calibri'
+    for r_data in rows:
+        row = table.add_row()
+        for i, text in enumerate(r_data):
+            cell = row.cells[i]
+            set_cell_bg(cell, HEX_LIGHT_NAVY if i == 0 else HEX_WHITE)
+            set_cell_border(cell, color='BFBFBF', sz=4)
+            p = cell.paragraphs[0]
+            run = p.add_run(str(text))
+            run.font.size = Pt(9.5)
+            run.font.name = 'Calibri'
+            if i == 0:
+                run.bold = True
+    doc.add_paragraph()
+
+
 # ── Document ──────────────────────────────────────────────────────────────────
 
 doc = Document()
@@ -420,9 +450,121 @@ add_two_col_table(doc,
 
 doc.add_paragraph()
 
-# ── Section 3: Quick Reference Checklist ─────────────────────────────────────
+# ── Section 3: How Upgrades Work ─────────────────────────────────────────────
 
-navy_band(doc, '3  Release Checklist  (print and tick off each time)')
+navy_band(doc, '3  How Upgrades Work — What the Installer Does on an Existing Machine')
+
+add_body(doc,
+    'When a customer runs a newer installer on a machine that already has Securiti Desktop '
+    'installed, Inno Setup detects the existing installation and runs in upgrade mode. '
+    'The behaviour is different from a fresh install in every way that matters.')
+
+add_note(doc,
+    'No data is lost during an upgrade. The database, cameras, faces, identities, '
+    'notifications, stream tokens, and all user accounts survive intact.')
+
+add_heading(doc, 'What the installer does, step by step (upgrade mode)')
+
+add_two_col_table(doc,
+    rows=[
+        ('1. Detect existing install',
+         'Inno Setup checks the Windows registry for the app\'s uninstall key '
+         '(keyed to the AppId GUID). If present → upgrade mode. If absent → fresh install.'),
+        ('2. Stop all three services',
+         'sc.exe stops VideoServerSecuritiService, FlaskSecuritiService, and '
+         'NginxSecuritiService in reverse dependency order. This releases the exclusive '
+         'file lock each service holds on its own .exe, allowing files to be overwritten.'),
+        ('3. Overwrite binary files',
+         'All application files are replaced: video_server.exe, SecuritiFlaskServer.exe, '
+         'nginx.exe, all DLLs, all AI model files, and Nginx config. Only software files '
+         'in Program Files are touched — nothing in ProgramData is written to.'),
+        ('4. Skip nssm install',
+         'The nssm install commands are skipped (they are guarded with Check: IsFreshInstall). '
+         'The services are already registered — re-registering them would error.'),
+        ('5. Update service config',
+         'All nssm set commands still run. These update service properties (AppDirectory, '
+         'log paths, rotation settings) in case anything changed between versions.'),
+        ('6. Restart services',
+         'nssm start runs for all three services in order: Nginx → Flask → VideoServer. '
+         'Services come back up running the new binaries.'),
+        ('7. Show upgrade confirmation',
+         '"Securiti Desktop updated to v1.x.x successfully. Your cameras, users, '
+         'identities, and all data have been preserved."'),
+    ],
+    header_row=['Phase', 'What happens'],
+)
+
+add_heading(doc, 'What is NEVER touched during an upgrade')
+
+add_two_col_table(doc,
+    rows=[
+        ('securiti.db',
+         'The SQLite database at C:\\ProgramData\\Securiti Desktop\\data\\securiti.db. '
+         'Contains: cameras, stream tokens, face embeddings, identities, identity sightings, '
+         'security zones, security rules, security alerts, notifications, sessions.'),
+        ('ServerLogs\\ and VideoServerLogs\\',
+         'Log files are never deleted or truncated by the installer.'),
+        ('Firebase credentials',
+         'Any credential or key files stored in ProgramData are untouched.'),
+        ('LocalX tunnel config',
+         'Tunnel registration and config files bundled in the Flask server folder '
+         'survive because the installer uses ignoreversion — it overwrites the binary '
+         'but leaves config files the server wrote at runtime alone.'),
+    ],
+    header_row=['Data', 'Location / Detail'],
+)
+
+add_heading(doc, 'What IS replaced during an upgrade')
+
+add_two_col_table(doc,
+    rows=[
+        ('video_server.exe',             'C:\\Program Files\\Securiti Desktop\\VideoServer\\'),
+        ('SecuritiFlaskServer.exe + all PyInstaller files', 'C:\\Program Files\\Securiti Desktop\\Server\\'),
+        ('nginx.exe + nginx.conf',       'C:\\Program Files\\Securiti Desktop\\Nginx\\'),
+        ('All DLL files',                'C:\\Program Files\\Securiti Desktop\\VideoServer\\*.dll'),
+        ('All AI model files (.onnx)',   'C:\\Program Files\\Securiti Desktop\\VideoServer\\models\\'),
+        ('nssm.exe',                     'C:\\Program Files\\Securiti Desktop\\NSSM\\'),
+    ],
+    header_row=['File(s)', 'Location'],
+)
+
+add_heading(doc, 'How the installer tells fresh install from upgrade')
+
+add_body(doc,
+    'Inno Setup writes an uninstall registry key the first time the software is installed. '
+    'On every subsequent run the installer checks for this key:')
+add_code_block(doc,
+    'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\\n'
+    '{8F3A2D1E-7B4C-4E9F-A6D2-1C8E5F0B3A97}_is1\n'
+    '\n'
+    'Key present   → IsUpgrade() = True  → upgrade mode\n'
+    'Key absent    → IsUpgrade() = False → fresh install mode')
+
+add_note(doc,
+    'The AppId GUID (8F3A2D1E-7B4C-4E9F-A6D2-1C8E5F0B3A97) is fixed in '
+    'SecuritiInstallerV1.iss and must never change. Changing it would make the '
+    'installer treat every upgrade as a fresh install and wipe the database.')
+
+add_heading(doc, 'Fresh install vs upgrade — side by side')
+
+add_three_col_table(doc,
+    rows=[
+        ('Detects existing install',       'No (first run)',                      'Yes (registry key present)'),
+        ('Stops running services',         'Yes (safe no-op if not installed)',   'Yes (required to unlock files)'),
+        ('Wipes securiti.db',              'Yes (clears stale dev data)',          'No — database is preserved'),
+        ('Runs nssm install',              'Yes (registers new services)',         'No — services already exist'),
+        ('Runs nssm set (config update)',  'Yes',                                  'Yes'),
+        ('Starts services',               'Yes',                                  'Yes (restarts them)'),
+        ('Success message',               '"Installed successfully"',             '"Updated to vX.X.X — data preserved"'),
+    ],
+    header_row=['Action', 'Fresh Install', 'Upgrade'],
+)
+
+doc.add_paragraph()
+
+# ── Section 4: Quick Reference Checklist ─────────────────────────────────────
+
+navy_band(doc, '4  Release Checklist  (print and tick off each time)')
 
 add_body(doc, 'Use this checklist for every release. Tick each item before moving to the next.')
 doc.add_paragraph()
@@ -448,7 +590,7 @@ doc.add_paragraph()
 
 # ── Section 4: What updates automatically ────────────────────────────────────
 
-navy_band(doc, '4  What Updates Automatically vs What You Do Manually')
+navy_band(doc, '5  What Updates Automatically vs What You Do Manually')
 
 add_two_col_table(doc,
     rows=[
@@ -469,7 +611,7 @@ add_two_col_table(doc,
 
 # ── Section 5: Common Mistakes ────────────────────────────────────────────────
 
-navy_band(doc, '5  Common Mistakes to Avoid')
+navy_band(doc, '6  Common Mistakes to Avoid')
 
 mistakes = [
     ('Building in Debug mode',
@@ -515,7 +657,7 @@ doc.add_paragraph()
 
 # ── Section 6: Key Paths ──────────────────────────────────────────────────────
 
-navy_band(doc, '6  Key File Paths & URLs')
+navy_band(doc, '7  Key File Paths & URLs')
 
 add_two_col_table(doc,
     rows=[
