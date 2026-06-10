@@ -1,0 +1,550 @@
+"""
+generate_release_guide.py
+Generates Securiti_Desktop_Release_Guide.docx — step-by-step deployment reference
+for publishing a new Securiti Desktop Server version.
+Run: python generate_release_guide.py
+"""
+
+from docx import Document
+from docx.shared import Pt, RGBColor, Inches, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+import copy
+
+# ── Brand colours (hex strings for XML, RGBColor for font/run colouring) ──────
+NAVY        = RGBColor(0x06, 0x00, 0x61)
+WHITE       = RGBColor(0xFF, 0xFF, 0xFF)
+LIGHT_NAVY  = RGBColor(0xE8, 0xE8, 0xF5)
+MID_GREY    = RGBColor(0x60, 0x60, 0x60)
+GREEN       = RGBColor(0x16, 0x80, 0x3A)
+AMBER       = RGBColor(0xD9, 0x77, 0x06)
+RED         = RGBColor(0xDC, 0x26, 0x26)
+CODE_BG     = RGBColor(0xF3, 0xF4, 0xF6)
+CODE_FG     = RGBColor(0x11, 0x18, 0x27)
+
+# Hex strings used for XML cell shading (set_cell_bg)
+HEX_NAVY       = '060061'
+HEX_WHITE      = 'FFFFFF'
+HEX_LIGHT_NAVY = 'E8E8F5'
+HEX_CODE_BG    = 'F3F4F6'
+HEX_AMBER_BG   = 'FFF7E6'
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def set_cell_bg(cell, hex_colour: str):
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    shd  = OxmlElement('w:shd')
+    shd.set(qn('w:val'),   'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'),  hex_colour.lstrip('#'))
+    tcPr.append(shd)
+
+def set_cell_border(cell, border_type='all', color='BFBFBF', sz=4):
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    tcBorders = OxmlElement('w:tcBorders')
+    sides = ['top', 'left', 'bottom', 'right'] if border_type == 'all' else [border_type]
+    for side in sides:
+        el = OxmlElement(f'w:{side}')
+        el.set(qn('w:val'),   'single')
+        el.set(qn('w:sz'),    str(sz))
+        el.set(qn('w:space'), '0')
+        el.set(qn('w:color'), color)
+        tcBorders.append(el)
+    tcPr.append(tcBorders)
+
+def add_table_borders(table, color='BFBFBF', sz=4):
+    for row in table.rows:
+        for cell in row.cells:
+            set_cell_border(cell, color=color, sz=sz)
+
+def navy_band(doc, text):
+    """Full-width navy section header band."""
+    table = doc.add_table(rows=1, cols=1)
+    table.style = 'Table Grid'
+    cell = table.cell(0, 0)
+    set_cell_bg(cell, HEX_NAVY)
+    set_cell_border(cell, color='060061', sz=6)
+    cell.paragraphs[0].clear()
+    run = cell.paragraphs[0].add_run(text.upper())
+    run.bold = True
+    run.font.color.rgb = WHITE
+    run.font.size = Pt(11)
+    run.font.name = 'Calibri'
+    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+    cell.paragraphs[0].paragraph_format.space_before = Pt(4)
+    cell.paragraphs[0].paragraph_format.space_after  = Pt(4)
+    doc.add_paragraph()
+
+def add_heading(doc, text, level=2):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after  = Pt(2)
+    run = p.add_run(text)
+    run.bold = True
+    run.font.size  = Pt(13 if level == 2 else 11)
+    run.font.color.rgb = NAVY
+    run.font.name  = 'Calibri'
+    return p
+
+def add_body(doc, text, space_after=4):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(space_after)
+    run = p.add_run(text)
+    run.font.size  = Pt(10)
+    run.font.color.rgb = RGBColor(0x1F, 0x1F, 0x1F)
+    run.font.name  = 'Calibri'
+    return p
+
+def add_note(doc, text, colour=HEX_LIGHT_NAVY, border_colour='060061'):
+    table = doc.add_table(rows=1, cols=1)
+    table.style = 'Table Grid'
+    cell = table.cell(0, 0)
+    set_cell_bg(cell, colour)
+    set_cell_border(cell, color=border_colour, sz=4)
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(3)
+    p.paragraph_format.space_after  = Pt(3)
+    run = p.add_run(text)
+    run.font.size = Pt(9.5)
+    run.font.name = 'Calibri'
+    doc.add_paragraph()
+
+def add_warning(doc, text):
+    add_note(doc, f'⚠  {text}', colour=HEX_AMBER_BG, border_colour='D97706')
+
+def add_code_block(doc, code: str):
+    """Monospaced grey code block."""
+    table = doc.add_table(rows=1, cols=1)
+    table.style = 'Table Grid'
+    cell = table.cell(0, 0)
+    set_cell_bg(cell, HEX_CODE_BG)
+    set_cell_border(cell, color='D1D5DB', sz=4)
+    cell.paragraphs[0].clear()
+    for i, line in enumerate(code.strip().split('\n')):
+        if i == 0:
+            p = cell.paragraphs[0]
+        else:
+            p = cell.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after  = Pt(0)
+        run = p.add_run(line if line else ' ')
+        run.font.name = 'Courier New'
+        run.font.size = Pt(8.5)
+        run.font.color.rgb = CODE_FG
+    doc.add_paragraph()
+
+def add_step_header(doc, step_num: int, title: str):
+    """Numbered step header with navy left border."""
+    table = doc.add_table(rows=1, cols=2)
+    table.style = 'Table Grid'
+    # Number cell
+    num_cell = table.cell(0, 0)
+    set_cell_bg(num_cell, HEX_NAVY)
+    set_cell_border(num_cell, color='060061', sz=6)
+    num_cell.width = Cm(1.2)
+    num_p = num_cell.paragraphs[0]
+    num_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    num_p.paragraph_format.space_before = Pt(4)
+    num_p.paragraph_format.space_after  = Pt(4)
+    run = num_p.add_run(str(step_num))
+    run.bold = True
+    run.font.color.rgb = WHITE
+    run.font.size = Pt(13)
+    run.font.name = 'Calibri'
+    # Title cell
+    title_cell = table.cell(0, 1)
+    set_cell_bg(title_cell, HEX_LIGHT_NAVY)
+    set_cell_border(title_cell, color='060061', sz=6)
+    title_p = title_cell.paragraphs[0]
+    title_p.paragraph_format.space_before = Pt(4)
+    title_p.paragraph_format.space_after  = Pt(4)
+    run2 = title_p.add_run(title)
+    run2.bold = True
+    run2.font.color.rgb = NAVY
+    run2.font.size = Pt(12)
+    run2.font.name = 'Calibri'
+    doc.add_paragraph()
+
+def add_checklist_item(doc, text, done=False):
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_before = Pt(1)
+    p.paragraph_format.space_after  = Pt(1)
+    prefix_run = p.add_run('☑  ' if done else '☐  ')
+    prefix_run.font.color.rgb = GREEN if done else MID_GREY
+    prefix_run.font.size = Pt(10)
+    prefix_run.font.name = 'Calibri'
+    text_run = p.add_run(text)
+    text_run.font.size = Pt(10)
+    text_run.font.name = 'Calibri'
+    if done:
+        text_run.font.color.rgb = MID_GREY
+
+def add_two_col_table(doc, rows, header_row=None, col_widths=None):
+    n_cols = len(rows[0]) if rows else 2
+    table = doc.add_table(rows=0, cols=n_cols)
+    table.style = 'Table Grid'
+    if header_row:
+        hrow = table.add_row()
+        for i, text in enumerate(header_row):
+            cell = hrow.cells[i]
+            set_cell_bg(cell, HEX_NAVY)
+            set_cell_border(cell, color='060061', sz=4)
+            p = cell.paragraphs[0]
+            run = p.add_run(text)
+            run.bold = True
+            run.font.color.rgb = WHITE
+            run.font.size = Pt(9.5)
+            run.font.name = 'Calibri'
+    for r_data in rows:
+        row = table.add_row()
+        for i, text in enumerate(r_data):
+            cell = row.cells[i]
+            set_cell_bg(cell, HEX_LIGHT_NAVY if i == 0 else HEX_WHITE)
+            set_cell_border(cell, color='BFBFBF', sz=4)
+            p = cell.paragraphs[0]
+            run = p.add_run(str(text))
+            run.font.size = Pt(9.5)
+            run.font.name = 'Calibri'
+            if i == 0:
+                run.bold = True
+    doc.add_paragraph()
+
+
+# ── Document ──────────────────────────────────────────────────────────────────
+
+doc = Document()
+
+# Page margins
+for section in doc.sections:
+    section.top_margin    = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin   = Cm(2.5)
+    section.right_margin  = Cm(2.5)
+
+# ── Cover ─────────────────────────────────────────────────────────────────────
+
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.paragraph_format.space_before = Pt(24)
+run = p.add_run('SECURITI DESKTOP SERVER')
+run.bold = True
+run.font.size = Pt(22)
+run.font.color.rgb = NAVY
+run.font.name = 'Calibri'
+
+p2 = doc.add_paragraph()
+p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run2 = p2.add_run('Release & Deployment Guide')
+run2.font.size = Pt(14)
+run2.font.color.rgb = MID_GREY
+run2.font.name = 'Calibri'
+
+p3 = doc.add_paragraph()
+p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run3 = p3.add_run('Version 1.0  ·  Colours Universal Inc  ·  June 2026')
+run3.font.size = Pt(9)
+run3.font.color.rgb = MID_GREY
+run3.font.name = 'Calibri'
+run3.italic = True
+
+doc.add_paragraph()
+doc.add_paragraph()
+
+add_note(doc,
+    'Use this guide every time you ship a new version of Securiti Desktop Server. '
+    'Follow Steps 1–7 in order. The website updates automatically after Step 6 — '
+    'no website code changes are required.',
+    colour=HEX_LIGHT_NAVY)
+
+doc.add_paragraph()
+
+# ── Section 1: Overview ───────────────────────────────────────────────────────
+
+navy_band(doc, '1  How Versioning Works')
+
+add_body(doc,
+    'There is one source of truth for the version number: MyAppVersion in '
+    'SecuritiInstallerV1.iss. Every other system reads from it automatically.')
+
+add_two_col_table(doc,
+    rows=[
+        ('MyAppVersion in .iss',        'The version number you change — e.g. "1.3.0"'),
+        ('Installer filename',           'Auto-derives: Securiti_Desktop_Setup_1.3.0.exe'),
+        ('Windows Apps & Features',      'Shows "Securiti Desktop 1.3.0" automatically'),
+        ('Installer → right-click → Details', 'Shows version 1.3.0 in PE file properties'),
+        ('GitHub release tag',           'You set this manually to match: v1.3.0'),
+        ('Website download page',        'Reads from GitHub API — updates automatically'),
+    ],
+    header_row=['Component', 'Where the version comes from'],
+)
+
+add_note(doc,
+    'Rule: bump MyAppVersion → build → upload to GitHub Releases. '
+    'The website needs no edits.')
+
+doc.add_paragraph()
+
+# ── Section 2: Step-by-step ───────────────────────────────────────────────────
+
+navy_band(doc, '2  Deployment Steps')
+
+# Step 1
+add_step_header(doc, 1, 'Bump the version number — one change, one file')
+add_body(doc, 'File:  python/securiti-desktop/installer_build/SecuritiInstallerV1.iss')
+add_code_block(doc, '#define MyAppVersion  "1.3.0"    ; ← change this line only')
+add_note(doc,
+    'This is the only manual version edit in the entire release process. '
+    'Everything else derives from it automatically.')
+
+# Step 2
+add_step_header(doc, 2, 'Build the Flask / Python server')
+add_body(doc, 'Run from: python/securiti-desktop/')
+add_code_block(doc, 'pyinstaller SecuritiFlaskServerV1.spec')
+add_body(doc, 'Output:  dist\\SecuritiFlaskServer\\', space_after=8)
+
+# Step 3
+add_step_header(doc, 3, 'Build the C++ video server (Release build only)')
+add_body(doc, 'Run from: CPP/video_server/')
+add_code_block(doc,
+    'cmake -B build -S . -DCMAKE_BUILD_TYPE=Release\n'
+    'cmake --build build --config Release')
+add_body(doc, 'Output:  build\\Release\\video_server.exe  +  all DLL files')
+add_warning(doc,
+    'Always build Release — never Debug. Debug builds link to MSVCP140D.dll which '
+    'is not redistributable and will fail to start on customer machines.')
+
+# Step 4
+add_step_header(doc, 4, 'Populate FilesToInstall\\')
+add_body(doc,
+    'Copy build outputs into the folder structure below before compiling the installer. '
+    'All folders must be present or Inno Setup will error.')
+add_code_block(doc,
+    'installer_build\\FilesToInstall\\\n'
+    '├── Server\\       ← dist\\SecuritiFlaskServer\\  (entire folder)\n'
+    '├── VideoServer\\  ← build\\Release\\video_server.exe + *.dll + models\\\n'
+    '│                    (copy all .dll files — do NOT copy .pdb debug symbols)\n'
+    '├── Nginx\\        ← C:\\nginx\\  (nginx.exe + conf\\ + html\\)\n'
+    '├── NSSM\\         ← nssm.exe\n'
+    '└── Redist\\       ← vc_redist.x64.exe')
+
+# Step 5
+add_step_header(doc, 5, 'Compile the installer with Inno Setup')
+add_body(doc,
+    'Open Inno Setup Compiler → File → Open → '
+    'installer_build\\SecuritiInstallerV1.iss → click Compile (or press F9).')
+add_body(doc,
+    'Output file will be created automatically at:')
+add_code_block(doc,
+    'installer_build\\Output\\Securiti_Desktop_Setup_{version}.exe\n'
+    '\n'
+    'Example for v1.3.0:\n'
+    'installer_build\\Output\\Securiti_Desktop_Setup_1.3.0.exe')
+add_note(doc,
+    'The filename is generated automatically from MyAppVersion — '
+    'you do not need to rename it.')
+
+# Step 6
+add_step_header(doc, 6, 'Upload to GitHub Releases')
+add_body(doc,
+    'Run the PowerShell script below. Replace 1.3.0 with the new version number. '
+    'The script creates the release, uploads the .exe, and publishes it in one go.')
+add_code_block(doc,
+    '$token   = $(gh auth token)\n'
+    '$version = "1.3.0"    # ← change this to match MyAppVersion\n'
+    '$file    = "C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\Output\\Securiti_Desktop_Setup_$version.exe"\n'
+    '\n'
+    '$headers = @{\n'
+    '    "Authorization" = "token $token"\n'
+    '    "Accept"        = "application/vnd.github+json"\n'
+    '    "Content-Type"  = "application/json"\n'
+    '}\n'
+    '\n'
+    '# 1. Create draft release\n'
+    '$body = @{\n'
+    '    tag_name = "v$version"\n'
+    '    name     = "Securiti Desktop Server v$version"\n'
+    '    draft    = $true\n'
+    '    body     = "## Securiti Desktop Server v$version`n`nSee release notes."\n'
+    '} | ConvertTo-Json\n'
+    '$release = Invoke-RestMethod `\n'
+    '    -Uri "https://api.github.com/repos/dominic96/securiti-releases/releases" `\n'
+    '    -Method Post -Headers $headers -Body $body\n'
+    '\n'
+    '# 2. Upload installer (allow up to 30 minutes for large file)\n'
+    '$uploadHeaders = @{\n'
+    '    "Authorization" = "token $token"\n'
+    '    "Content-Type"  = "application/octet-stream"\n'
+    '}\n'
+    '$uploadUrl = "https://uploads.github.com/repos/dominic96/securiti-releases/releases/$($release.id)/assets?name=Securiti_Desktop_Setup_$version.exe"\n'
+    'Invoke-RestMethod `\n'
+    '    -Uri $uploadUrl -Method Post `\n'
+    '    -Headers $uploadHeaders `\n'
+    '    -Body ([System.IO.File]::ReadAllBytes($file)) `\n'
+    '    -TimeoutSec 1800\n'
+    '\n'
+    '# 3. Publish the release (take out of draft)\n'
+    '$publishBody = @{ draft = $false } | ConvertTo-Json\n'
+    'Invoke-RestMethod `\n'
+    '    -Uri "https://api.github.com/repos/dominic96/securiti-releases/releases/$($release.id)" `\n'
+    '    -Method Patch -Headers $headers -Body $publishBody\n'
+    '\n'
+    'Write-Host "Done! https://github.com/dominic96/securiti-releases/releases/tag/v$version"')
+add_warning(doc,
+    'The upload can take 5–15 minutes for a ~400 MB file. '
+    'Do not close PowerShell while it is running.')
+
+# Step 7
+add_step_header(doc, 7, 'Verify the website has updated')
+add_body(doc,
+    'Open the download page in a browser. Within a few minutes of publishing the '
+    'GitHub release the page should show the new version number, release date, '
+    'and file size automatically. No website edits are needed.')
+add_body(doc, 'To confirm the API is returning the new release, open this URL in a browser:')
+add_code_block(doc,
+    'https://api.github.com/repos/dominic96/securiti-releases/releases/latest')
+add_body(doc, 'Check that these fields match your new build:')
+add_two_col_table(doc,
+    rows=[
+        ('tag_name',          'Should be "v1.3.0" (or your new version)'),
+        ('assets[0].name',    'Should be "Securiti_Desktop_Setup_1.3.0.exe"'),
+        ('assets[0].size',    'Should match the file size of the new installer (bytes)'),
+        ('assets[0].browser_download_url', 'Should include "v1.3.0" in the URL path'),
+    ],
+    header_row=['API field', 'Expected value'],
+)
+
+doc.add_paragraph()
+
+# ── Section 3: Quick Reference Checklist ─────────────────────────────────────
+
+navy_band(doc, '3  Release Checklist  (print and tick off each time)')
+
+add_body(doc, 'Use this checklist for every release. Tick each item before moving to the next.')
+doc.add_paragraph()
+
+steps_check = [
+    ('Step 1', 'MyAppVersion updated in SecuritiInstallerV1.iss'),
+    ('Step 2', 'Flask server built with PyInstaller — dist\\SecuritiFlaskServer\\ present'),
+    ('Step 3', 'C++ video server built in Release mode — video_server.exe present in build\\Release\\'),
+    ('Step 4', 'FilesToInstall\\ fully populated — Server\\, VideoServer\\, Nginx\\, NSSM\\, Redist\\ all present'),
+    ('Step 5', 'Inno Setup compiled successfully — Securiti_Desktop_Setup_{version}.exe present in Output\\'),
+    ('Step 5', 'Installer filename includes the correct version number'),
+    ('Step 6', 'GitHub release created with tag v{version}'),
+    ('Step 6', 'Installer .exe attached to the GitHub release as an asset'),
+    ('Step 6', 'Release published (not left as draft)'),
+    ('Step 7', 'GitHub API returns the new version at /releases/latest'),
+    ('Step 7', 'Website download page shows new version, date, and file size'),
+    ('Step 7', 'Download button triggers the correct versioned .exe file'),
+]
+for label, text in steps_check:
+    add_checklist_item(doc, f'[{label}]  {text}')
+
+doc.add_paragraph()
+
+# ── Section 4: What updates automatically ────────────────────────────────────
+
+navy_band(doc, '4  What Updates Automatically vs What You Do Manually')
+
+add_two_col_table(doc,
+    rows=[
+        ('Installer filename',           '✅ Auto — derived from MyAppVersion in .iss'),
+        ('Windows Apps & Features name', '✅ Auto — derived from MyAppVersion in .iss'),
+        ('Exe right-click → Details',    '✅ Auto — derived from MyAppVersion in .iss'),
+        ('Website version badge',        '✅ Auto — reads from GitHub API'),
+        ('Website release date',         '✅ Auto — reads from GitHub API'),
+        ('Website file size',            '✅ Auto — reads from GitHub API'),
+        ('Website download button URL',  '✅ Auto — reads from GitHub API'),
+        ('Website version history table','✅ Auto — reads from GitHub API'),
+        ('MyAppVersion in .iss',         '✏️  Manual — you change this (one line)'),
+        ('$version in upload script',    '✏️  Manual — you change this to match (one line)'),
+        ('GitHub release notes / body',  '✏️  Manual — edit the $body in the upload script'),
+    ],
+    header_row=['Component', 'How it updates'],
+)
+
+# ── Section 5: Common Mistakes ────────────────────────────────────────────────
+
+navy_band(doc, '5  Common Mistakes to Avoid')
+
+mistakes = [
+    ('Building in Debug mode',
+     'Always use --config Release. Debug builds link to MSVCP140D.dll which is not '
+     'redistributable. The installer will fail to run on customer machines.'),
+    ('Leaving the release as a Draft',
+     'Draft releases are not visible to the public and the GitHub API will not '
+     'return them at /releases/latest. Always publish before verifying the website.'),
+    ('Hardcoding version numbers in website code',
+     'The website reads all values dynamically from the GitHub API. Never hardcode '
+     'the version, file size, date, or download URL — it will be wrong for the next release.'),
+    ('Mismatching MyAppVersion and the GitHub tag',
+     'If MyAppVersion = "1.3.0" but the GitHub tag is "v1.4.0", the filename and '
+     'the website will show different versions. They must match exactly.'),
+    ('Forgetting to populate FilesToInstall\\',
+     'Inno Setup will silently omit files or error if the source folders are stale. '
+     'Always re-copy fresh build outputs before compiling the installer.'),
+    ('Uploading a Debug .pdb file',
+     'Do not copy .pdb symbol files into VideoServer\\. They are large (~200 MB each) '
+     'and serve no purpose in the installer.'),
+]
+
+for title, body in mistakes:
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after  = Pt(0)
+    run = p.add_run(f'✗  {title}')
+    run.bold = True
+    run.font.color.rgb = RED
+    run.font.size = Pt(10)
+    run.font.name = 'Calibri'
+
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_before = Pt(0)
+    p2.paragraph_format.space_after  = Pt(6)
+    p2.paragraph_format.left_indent  = Cm(0.8)
+    run2 = p2.add_run(body)
+    run2.font.size = Pt(9.5)
+    run2.font.name = 'Calibri'
+    run2.font.color.rgb = RGBColor(0x1F, 0x1F, 0x1F)
+
+doc.add_paragraph()
+
+# ── Section 6: Key Paths ──────────────────────────────────────────────────────
+
+navy_band(doc, '6  Key File Paths & URLs')
+
+add_two_col_table(doc,
+    rows=[
+        ('Version definition',    'python/securiti-desktop/installer_build/SecuritiInstallerV1.iss  →  #define MyAppVersion'),
+        ('Flask build output',    'python/securiti-desktop/dist/SecuritiFlaskServer/'),
+        ('C++ build output',      'CPP/video_server/build/Release/'),
+        ('Installer input',       'python/securiti-desktop/installer_build/FilesToInstall/'),
+        ('Installer output',      'python/securiti-desktop/installer_build/Output/Securiti_Desktop_Setup_{version}.exe'),
+        ('GitHub releases repo',  'https://github.com/dominic96/securiti-releases'),
+        ('GitHub API (latest)',   'https://api.github.com/repos/dominic96/securiti-releases/releases/latest'),
+        ('GitHub API (all)',      'https://api.github.com/repos/dominic96/securiti-releases/releases'),
+        ('Download page fallback','https://github.com/dominic96/securiti-releases/releases/latest'),
+    ],
+    header_row=['Item', 'Path / URL'],
+)
+
+# ── Footer ────────────────────────────────────────────────────────────────────
+
+doc.add_paragraph()
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = p.add_run('Securiti Desktop Server — Release Guide  ·  Colours Universal Inc  ·  confidential')
+run.font.size = Pt(8)
+run.font.color.rgb = MID_GREY
+run.font.name = 'Calibri'
+run.italic = True
+
+# ── Save ─────────────────────────────────────────────────────────────────────
+
+output = 'Securiti_Desktop_Release_Guide.docx'
+doc.save(output)
+print(f'Generated: {output}')
