@@ -617,6 +617,12 @@ mistakes = [
     ('Building in Debug mode',
      'Always use --config Release. Debug builds link to MSVCP140D.dll which is not '
      'redistributable. The installer will fail to run on customer machines.'),
+    ('Changing the AppId GUID in SecuritiInstallerV1.iss',
+     'The AppId {8F3A2D1E-7B4C-4E9F-A6D2-1C8E5F0B3A97} must never be changed. '
+     'It is the key Inno Setup uses to detect an existing installation (IsUpgrade). '
+     'If you change it, every upgrade will be treated as a fresh install — the installer '
+     'will wipe securiti.db and all customer data: cameras, faces, identities, '
+     'notifications, and accounts will be permanently deleted with no warning.'),
     ('Leaving the release as a Draft',
      'Draft releases are not visible to the public and the GitHub API will not '
      'return them at /releases/latest. Always publish before verifying the website.'),
