@@ -384,14 +384,14 @@ add_body(doc,
     'A ready-to-run PowerShell script handles the entire release in one go: '
     'creating the draft, uploading the installer, and publishing. '
     'There is only one line to edit before running it.')
-add_body(doc, 'Script location:')
+add_body(doc, 'Script file (open this in any text editor to edit it):')
 add_code_block(doc,
-    'python/securiti-desktop/installer_build/publish_release.ps1')
+    'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\publish_release.ps1')
 add_body(doc, 'The only line you need to edit is at the top of the script:')
 add_code_block(doc,
     '$Version = "1.3.0"   # ← change this to match MyAppVersion in SecuritiInstallerV1.iss')
 add_body(doc,
-    'Optionally update $ReleaseNotes in the same file to describe what changed. '
+    'Optionally update $ReleaseNotes in the same file to describe what changed in this version. '
     'Then run the script from PowerShell:')
 add_code_block(doc,
     'cd "C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build"\n'
@@ -649,11 +649,12 @@ navy_band(doc, '7  Key File Paths & URLs')
 
 add_two_col_table(doc,
     rows=[
-        ('Version definition',    'python/securiti-desktop/installer_build/SecuritiInstallerV1.iss  →  #define MyAppVersion'),
-        ('Flask build output',    'python/securiti-desktop/dist/SecuritiFlaskServer/'),
-        ('C++ build output',      'CPP/video_server/build/Release/'),
-        ('Installer input',       'python/securiti-desktop/installer_build/FilesToInstall/'),
-        ('Installer output',      'python/securiti-desktop/installer_build/Output/Securiti_Desktop_Setup_{version}.exe'),
+        ('Version definition',    'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\SecuritiInstallerV1.iss  →  #define MyAppVersion'),
+        ('Release script',        'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\publish_release.ps1  →  $Version'),
+        ('Flask build output',    'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\dist\\SecuritiFlaskServer\\'),
+        ('C++ build output',      'C:\\Users\\domin\\Workspace\\CPP\\video_server\\build\\Release\\'),
+        ('Installer input',       'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\FilesToInstall\\'),
+        ('Installer output',      'C:\\Users\\domin\\Workspace\\python\\securiti-desktop\\installer_build\\Output\\Securiti_Desktop_Setup_{version}.exe'),
         ('GitHub releases repo',  'https://github.com/dominic96/securiti-releases'),
         ('GitHub API (latest)',   'https://api.github.com/repos/dominic96/securiti-releases/releases/latest'),
         ('GitHub API (all)',      'https://api.github.com/repos/dominic96/securiti-releases/releases'),
