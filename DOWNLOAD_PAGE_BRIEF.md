@@ -335,9 +335,9 @@ Use the primary. Alternatives are for A/B testing:
 
 Before the download page goes live, confirm:
 
-- [ ] GitHub release `v1.2.0` is published and `Securiti_V1_Setup.exe` is attached — **done** ✅
-- [ ] API call `https://api.github.com/repos/dominic96/securiti-releases/releases/latest` returns the asset
-- [ ] Direct URL `https://github.com/dominic96/securiti-releases/releases/latest/download/Securiti_V1_Setup.exe` triggers a download in the browser
+- [x] GitHub release `v1.2.0` is published and `Securiti_V1_Setup.exe` is attached ✅
+- [x] API call `https://api.github.com/repos/dominic96/securiti-releases/releases/latest` returns the asset ✅
+- [x] Direct URL `https://github.com/dominic96/securiti-releases/releases/latest/download/Securiti_V1_Setup.exe` triggers a download in the browser ✅
 - [ ] Google Play Store URL confirmed and live — **TBD**
 - [ ] Apple App Store URL confirmed and live — **TBD**
 - [ ] Web App URL confirmed — **TBD**
