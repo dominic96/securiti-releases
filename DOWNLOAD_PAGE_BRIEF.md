@@ -32,10 +32,10 @@ The installer is hosted on GitHub Releases:
 
 | Field | Value |
 |---|---|
-| Version tag | **v1.2.0** |
-| Release date | June 2026 |
-| File name | `Securiti_Desktop_Setup_1.2.0.exe` |
-| File size | **377 MB** |
+| Version tag | **v1.2.0** *(current — load live value from API)* |
+| Release date | June 2026 *(current — load live value from API)* |
+| File name | `Securiti_Desktop_Setup_{version}.exe` *(versioned — load from `assets[0].name`)* |
+| File size | *(varies per release — load from `assets[0].size`, convert to MB)* |
 | Platform | Windows 10 / Windows 11 (64-bit) |
 
 ---
@@ -216,11 +216,11 @@ Below the main download card, include a collapsible or secondary table of all pu
 
 | Version | Release Date | Platform | Size | Download |
 |---|---|---|---|---|
-| v1.2.0 *(Latest)* | June 2026 | Windows 10/11 64-bit | 377 MB | [Download] |
+| *(loaded from API)* | *(loaded from API)* | Windows 10/11 64-bit | *(loaded from API)* | *(loaded from API)* |
 
-> This table should also be loaded from the GitHub Releases API:
+> Load this table from the GitHub Releases API — do **not** hardcode any values (version, date, size, or download URL all change with each release):
 > `GET https://api.github.com/repos/dominic96/securiti-releases/releases`
-> Returns an array — map each item the same way as the latest release.
+> Returns an array — map each release the same way as the latest: `tag_name`, `published_at`, `assets[0].size` (bytes → MB), `assets[0].browser_download_url`.
 
 ---
 
