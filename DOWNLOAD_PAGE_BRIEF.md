@@ -25,7 +25,7 @@ The installer is hosted on GitHub Releases:
 |---|---|
 | **GitHub repo** | `https://github.com/dominic96/securiti-releases` |
 | **Latest release page** | `https://github.com/dominic96/securiti-releases/releases/latest` |
-| **Direct download (latest)** | `https://github.com/dominic96/securiti-releases/releases/latest/download/Securiti_V1_Setup.exe` |
+| **Direct download (latest)** | Use `assets[0].browser_download_url` from the API — filename is versioned (e.g. `Securiti_Desktop_Setup_1.2.0.exe`) |
 | **GitHub Releases API** | `https://api.github.com/repos/dominic96/securiti-releases/releases/latest` |
 
 ### Current Version
@@ -34,7 +34,7 @@ The installer is hosted on GitHub Releases:
 |---|---|
 | Version tag | **v1.2.0** |
 | Release date | June 2026 |
-| File name | `Securiti_V1_Setup.exe` |
+| File name | `Securiti_Desktop_Setup_1.2.0.exe` |
 | File size | **377 MB** |
 | Platform | Windows 10 / Windows 11 (64-bit) |
 
@@ -107,7 +107,7 @@ Hardcode a fallback directly on the button so users can still download if the AP
 
 ```html
 <a id="download-btn"
-   href="https://github.com/dominic96/securiti-releases/releases/latest/download/Securiti_V1_Setup.exe"
+   href="https://github.com/dominic96/securiti-releases/releases/latest"
    download>
   Download for Windows
 </a>
